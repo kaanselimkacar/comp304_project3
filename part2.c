@@ -39,7 +39,6 @@ struct lru_entry{
 struct lru_list{
   int size;
   struct lru_entry *head;
-
 };
 
 
@@ -68,7 +67,7 @@ int max(int a, int b)
 
 //adds an item to the lru list
 void add_to_lru(int logical, int physical){
-  if (lru_list.size >= FRAMES){
+  if (lru_list.size >= FRAMES){ // no need to make it larger than FRAMES
     return;
   }
   struct lru_entry *entry = malloc(sizeof(struct lru_entry));
@@ -154,11 +153,11 @@ void add_to_tlb(unsigned char logical, unsigned char physical) {
     tlbindex++;
 }
 
-/* Returns the logical address of the given physical address */
-int get_logical_address(int physical_address) {
+/* Returns the logical page of the given physical page */
+int get_logical_page(int physical_page) {
   int i;
   for (i = 0; i < PAGES; i++) {
-    if (pagetable[i] == physical_address) {
+    if (pagetable[i] == physical_page) {
       return i;
     }
   }
@@ -231,8 +230,8 @@ int main(int argc, const char *argv[])
             // Increment free_page
             // Increment page_faults
             ///////////////
-            memcpy(main_memory + free_page * PAGE_SIZE, backing + logical_page * PAGE_SIZE, PAGE_SIZE);
             physical_page = free_page;
+            memcpy(main_memory + physical_page * PAGE_SIZE, backing + logical_page * PAGE_SIZE, PAGE_SIZE);
             pagetable[logical_page] = physical_page;
             free_page++;
             free_page_int++;
@@ -240,10 +239,10 @@ int main(int argc, const char *argv[])
           }
           else if (policy == FIFO){
             //need replacement
-            int replacement_index = get_logical_address(free_page);
-            pagetable[replacement_index] = -1;
-            memcpy(main_memory + free_page * PAGE_SIZE, backing + logical_page * PAGE_SIZE, PAGE_SIZE);
             physical_page = free_page;
+            int replacement_index = get_logical_page(physical_page);
+            pagetable[replacement_index] = -1;
+            memcpy(main_memory + physical_page * PAGE_SIZE, backing + logical_page * PAGE_SIZE, PAGE_SIZE);
             pagetable[logical_page] = physical_page;
             free_page++;
             free_page_int++;
@@ -252,17 +251,16 @@ int main(int argc, const char *argv[])
           else if (policy == LRU){
             /*TODO: implement*/
             //head of the lru_list will be the least recently used page
-            int replacement_physical_address = lru_list.head->physical;
-            int replacement_logical_address = get_logical_address(replacement_physical_address);
-            pagetable[replacement_logical_address] = -1;
-            remove_from_lru(replacement_logical_address);
-            memcpy(main_memory + replacement_physical_address * PAGE_SIZE, backing + logical_page * PAGE_SIZE, PAGE_SIZE);
-            physical_page = replacement_physical_address;
+            int replacement_physical_page = lru_list.head->physical;
+            int replacement_logical_page = get_logical_page(replacement_physical_page);
+            //move the replacement_page out of the memory
+            pagetable[replacement_logical_page] = -1;
+            remove_from_lru(replacement_logical_page);
+            memcpy(main_memory + replacement_physical_page * PAGE_SIZE, backing + logical_page * PAGE_SIZE, PAGE_SIZE);
+            physical_page = replacement_physical_page;
             pagetable[logical_page] = physical_page;
             page_faults++;
-
           }
-          
       }
       add_to_tlb(logical_page, physical_page);
 
@@ -278,7 +276,6 @@ int main(int argc, const char *argv[])
   free_lru_list();
   if (policy == LRU){
     printf("Page replacement policy was LRU\n");
-
   }
   else{
     printf("Page replacement policy was FIFO\n");

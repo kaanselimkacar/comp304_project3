@@ -128,9 +128,9 @@ int main(int argc, const char *argv[])
           // Increment free_page
           // Increment page_faults
           ///////////////
-          memcpy(main_memory + free_page * PAGE_SIZE, backing + logical_page * PAGE_SIZE, PAGE_SIZE);
-          pagetable[logical_page] = free_page;
           physical_page = free_page;
+          memcpy(main_memory + physical_page * PAGE_SIZE, backing + logical_page * PAGE_SIZE, PAGE_SIZE);
+          pagetable[logical_page] = physical_page;
           free_page++;
           page_faults++;
       }
