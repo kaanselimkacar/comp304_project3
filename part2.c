@@ -100,7 +100,21 @@ int remove_from_lru(int logical){
   struct lru_entry *prev = iterator;
   int physical;
   int i = 0;
-  for(i; i<lru_list.size; i++){
+  
+  if (lru_list.head->logical == logical) {
+  	lru_list.head = lru_list.head->next;
+  	lru_list.size--;
+  	physical = iterator->physical;
+  	free(iterator);
+  	free(prev);
+  	return physical;
+  }
+  if (iterator->next==NULL) {
+  	return -1;
+  }
+  iterator = iterator->next;
+  
+  while (iterator->next != NULL){
     if (iterator->logical == logical){
       prev->next = iterator->next;
       lru_list.size--;
@@ -252,6 +266,7 @@ int main(int argc, const char *argv[])
             /*TODO: implement*/
             //head of the lru_list will be the least recently used page
             int replacement_physical_page = lru_list.head->physical;
+ 
             int replacement_logical_page = get_logical_page(replacement_physical_page);
             //move the replacement_page out of the memory
             pagetable[replacement_logical_page] = -1;
