@@ -160,10 +160,6 @@ int main(int argc, const char *argv[])
     least_recently_used[i] = -1;
   }
   
-  //
-  
-  
-  
   // Character buffer for reading lines of input file.
   char buffer[BUFFER_SIZE];
   
@@ -176,8 +172,6 @@ int main(int argc, const char *argv[])
   unsigned char free_page = 0;
   unsigned int free_page_int = 0;
 
-
-
   while (fgets(buffer, BUFFER_SIZE, input_fp) != NULL) {
     total_addresses++;
     int logical_address = atoi(buffer);
@@ -187,8 +181,7 @@ int main(int argc, const char *argv[])
     int offset = logical_address  & OFFSET_MASK;
     int logical_page = (logical_address >> OFFSET_BITS) & OFFSET_MASK;
     ///////
-
-
+    
     int physical_page = search_tlb(logical_page);
     // TLB hit
     if (physical_page != -1) {
