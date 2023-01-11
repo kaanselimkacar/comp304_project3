@@ -27,13 +27,13 @@
 #define BUFFER_SIZE 10
 
 struct tlbentry {
-  unsigned char logical;
-  unsigned char physical;
+  unsigned int logical;
+  unsigned int physical;
 };
 
 struct lru_entry{
-  int logical;
-  int physical;
+  int logical; //logical address
+  int physical; //physical page
   struct lru_entry *next;
 };
 struct lru_list{
@@ -53,7 +53,7 @@ int tlbindex = 0;
 // pagetable[logical_page] is the physical page number for logical page. Value is -1 if that logical page isn't yet in the table.
 int pagetable[PAGES];
 
-signed char main_memory[MEMORY_SIZE];
+signed int main_memory[MEMORY_SIZE];
 
 // Pointer to memory mapped backing file
 signed char *backing;
@@ -66,8 +66,9 @@ int max(int a, int b)
 }
 
 //adds an item to the lru list
+//takes logical address and physical page
 void add_to_lru(int logical, int physical){
-  if (lru_list.size >= FRAMES){ // no need to make it larger than FRAMES
+  if (lru_list.size >= FRAMES){
     return;
   }
   struct lru_entry *entry = malloc(sizeof(struct lru_entry));
@@ -80,13 +81,11 @@ void add_to_lru(int logical, int physical){
     lru_list.size++;
     return;
   }
-  int i = 1;
   struct lru_entry *iterator = lru_list.head;
   
-  for (i ; i<lru_list.size; i++){
+  while (iterator->next != NULL){
     iterator = iterator->next;
   }
-  
   iterator->next = entry;
   lru_list.size++;
   return;
@@ -96,11 +95,21 @@ int remove_from_lru(int logical){
   if (lru_list.size == 0){
     return -1;
   }
+  
   struct lru_entry *iterator = lru_list.head;
   struct lru_entry *prev = iterator;
   int physical;
-  int i = 0;
-  for(i; i<lru_list.size; i++){
+  //int i = 0;
+  if (lru_list.head->logical == logical){
+    lru_list.head = lru_list.head->next;
+    lru_list.size--;
+    physical = iterator->physical;
+    free(iterator);
+    return physical;
+  }
+  while (iterator->next != NULL){
+    prev = iterator;
+    iterator = iterator->next;
     if (iterator->logical == logical){
       prev->next = iterator->next;
       lru_list.size--;
@@ -108,8 +117,6 @@ int remove_from_lru(int logical){
       free(iterator);
       return physical;
     }
-    prev = iterator;
-    iterator = iterator->next;
   }
   return -1;
 }
@@ -131,7 +138,7 @@ void free_lru_list(){
   free(lru_list.head);
 }
 /* Returns the physical address from TLB or -1 if not present. */
-int search_tlb(unsigned char logical_page) {
+int search_tlb(unsigned int logical_page) {
     /* TODO */
     int i = 0;
     for (i;i<TLB_SIZE;i++){
@@ -143,7 +150,7 @@ int search_tlb(unsigned char logical_page) {
 }
 
 /* Adds the specified mapping to the TLB, replacing the oldest mapping (FIFO replacement). */
-void add_to_tlb(unsigned char logical, unsigned char physical) {
+void add_to_tlb(unsigned int logical, unsigned int physical) {
     /* TODO */
     struct tlbentry entry;
     entry.logical = logical;
@@ -152,6 +159,7 @@ void add_to_tlb(unsigned char logical, unsigned char physical) {
     tlb[tlb_index] = entry;
     tlbindex++;
 }
+
 //changes the physical page of the given logical page in the tlb
 //makes it -1 to showcase that the memory where the tlb entry is pointing to
 //is no longer valid
@@ -165,7 +173,7 @@ void change_from_tlb(int logical_page){
   }
 }
 
-/* Returns the logical page of the given physical page */
+/* Returns the logical address of the given physical page */
 int get_logical_page(int physical_page) {
   int i;
   for (i = 0; i < PAGES; i++) {
@@ -243,7 +251,10 @@ int main(int argc, const char *argv[])
             // Increment page_faults
             ///////////////
             physical_page = free_page;
-            memcpy(main_memory + physical_page * PAGE_SIZE, backing + logical_page * PAGE_SIZE, PAGE_SIZE);
+            int i;
+            for (i = 0; i< PAGE_SIZE ; i++){
+              main_memory[physical_page * PAGE_SIZE + i] = backing[logical_page * PAGE_SIZE + i];
+            }
             pagetable[logical_page] = physical_page;
             free_page++;
             free_page_int++;
@@ -253,43 +264,46 @@ int main(int argc, const char *argv[])
             //need replacement
             physical_page = free_page;
             int replacement_logical_page = get_logical_page(physical_page);
-            //take it out of tlb
-            change_from_tlb(replacement_logical_page);
             pagetable[replacement_logical_page] = -1;
-            memcpy(main_memory + physical_page * PAGE_SIZE, backing + logical_page * PAGE_SIZE, PAGE_SIZE);
+            change_from_tlb(replacement_logical_page);
+            for (i = 0; i< PAGE_SIZE ; i++){
+              main_memory[physical_page * PAGE_SIZE + i] = backing[logical_page * PAGE_SIZE + i];
+            }
             pagetable[logical_page] = physical_page;
             free_page++;
             free_page_int++;
             page_faults++;
           }
           else if (policy == LRU){
-            /*TODO: implement*/
+            
             //head of the lru_list will be the least recently used page
             int replacement_physical_page = lru_list.head->physical;
             int replacement_logical_address = lru_list.head->logical;
             int replacement_logical_page = get_logical_page(replacement_physical_page);
-            //take it out of tlb
-            change_from_tlb(replacement_logical_page);
-            //move the replacement_page out of the memory
+            //take it out of the pagetable
             pagetable[replacement_logical_page] = -1;
+            //take it out of the tlb
+            change_from_tlb(replacement_logical_page);
             remove_from_lru(replacement_logical_address);
-            memcpy(main_memory + replacement_physical_page * PAGE_SIZE, backing + logical_page * PAGE_SIZE, PAGE_SIZE);
             physical_page = replacement_physical_page;
+            for (i = 0; i< PAGE_SIZE ; i++){
+              main_memory[physical_page * PAGE_SIZE + i] = backing[logical_page * PAGE_SIZE + i];
+            }
             pagetable[logical_page] = physical_page;
+            free_page++;
+            free_page_int++;
             page_faults++;
           }
       }
       add_to_tlb(logical_page, physical_page);
-
       remove_from_lru(logical_address);
       add_to_lru(logical_address, physical_page);
     }
-    
     int physical_address = (physical_page << OFFSET_BITS) | offset;
     signed char value = main_memory[physical_page * PAGE_SIZE + offset];
-    //printf("Free pages = %d\n",free_page);
     printf("Virtual address: %d Physical address: %d Value: %d\n", logical_address, physical_address, value);
   }
+
   free_lru_list();
   if (policy == LRU){
     printf("Page replacement policy was LRU\n");
