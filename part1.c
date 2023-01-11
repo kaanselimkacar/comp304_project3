@@ -111,7 +111,6 @@ int main(int argc, const char *argv[])
     int offset = logical_address  & OFFSET_MASK;
     int logical_page = (logical_address >> OFFSET_BITS) & OFFSET_MASK;
     ///////
-
     
     int physical_page = search_tlb(logical_page);
     // TLB hit
